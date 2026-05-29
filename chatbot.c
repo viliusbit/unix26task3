@@ -23,6 +23,7 @@ struct sembuf p = {0, -1, SEM_UNDO};
 struct sembuf v = {0, 1, SEM_UNDO};  
 
 void handle_sigint(int sig) {
+    (void)sig;
     shmdt(msg_count);
     shmctl(shmid, IPC_RMID, NULL);
     semctl(semid, 0, IPC_RMID);
@@ -38,7 +39,7 @@ void ask_ollama(const char *prompt, char *response) {
     FILE *fp = popen(cmd, "r");
     if (fp) {
         if(fgets(response, 1024, fp) == NULL) {
-            strcpy(response, "Error getting response.");
+            strcpy(response, "Error.");
         }
         pclose(fp);
     }
@@ -47,7 +48,7 @@ void ask_ollama(const char *prompt, char *response) {
 void run_bot(const char *channel, int semid, int *shared_counter, int pipe_fd) {
     int sock;
     struct sockaddr_in serv_addr;
-    char buffer[2048], msg[1024];
+    char buffer[4096], msg[4096];
 
     sock = socket(AF_INET, SOCK_STREAM, 0);
     serv_addr.sin_family = AF_INET;
@@ -58,10 +59,10 @@ void run_bot(const char *channel, int semid, int *shared_counter, int pipe_fd) {
         exit(1);
     }
 
-    sprintf(msg, "NICK %s\r\nUSER %s 0 * :AI Bot\r\n", BOT_NICK, USERNAME);
+    snprintf(msg, sizeof(msg), "NICK %s\r\nUSER %s 0 * :AI Bot\r\n", BOT_NICK, USERNAME);
     send(sock, msg, strlen(msg), 0);
     sleep(2);
-    sprintf(msg, "JOIN %s\r\n", channel);
+    snprintf(msg, sizeof(msg), "JOIN %s\r\n", channel);
     send(sock, msg, strlen(msg), 0);
 
     while (1) {
@@ -84,14 +85,14 @@ void run_bot(const char *channel, int semid, int *shared_counter, int pipe_fd) {
                 ask_ollama(chat_content, ai_out);
 
                 char log_msg[256];
-                snprintf(log_msg, 256, "Channel %s: Replied to %s\n", channel, USERNAME);
+                snprintf(log_msg, sizeof(log_msg), "Channel %s: Replied\n", channel);
                 write(pipe_fd, log_msg, strlen(log_msg));
 
                 semop(semid, &p, 1);
                 (*shared_counter)++;
                 semop(semid, &v, 1);
 
-                sprintf(msg, "PRIVMSG %s :%s\r\n", channel, ai_out);
+                snprintf(msg, sizeof(msg), "PRIVMSG %s :%s\r\n", channel, ai_out);
                 send(sock, msg, strlen(msg), 0);
             }
         }
@@ -131,7 +132,7 @@ int main() {
         if (bytes > 0) {
             log_buffer[bytes] = '\0';
             printf("%s", log_buffer);
-            printf("Total messages: %d\n", *msg_count);
+            printf("Count: %d\n", *msg_count);
         }
     }
 
