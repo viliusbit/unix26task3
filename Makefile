@@ -1,7 +1,5 @@
-all: chatbot
-
-chatbot: chatbot.c
-	gcc -Wall -Wextra chatbot chatbot.c
+all:
+	gcc -Wall -Wextra -o chatbot chatbot.c
 
 clean:
 	rm -f chatbot
